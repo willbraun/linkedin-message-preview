@@ -1,0 +1,17 @@
+{
+	"manifest_version": 3,
+	"name": "LinkedIn Message Preview",
+	"description": "Allows a LinkedIn user to hover over a message to read it, without marking it as read.",
+	"version": "1.0",
+	"permissions": ["activeTab"],
+	"action": {
+		"default_icon": "/images/favicon.png"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://www.linkedin.com/*"],
+			"css": ["styles.css"],
+			"js": ["content-script.js"]
+		}
+	]
+}
