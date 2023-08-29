@@ -11,7 +11,7 @@
 		{
 			"matches": ["https://www.linkedin.com/*"],
 			"css": ["styles.css"],
-			"js": ["content-script.js"]
+			"js": ["dest/content-script.js"]
 		}
 	]
 }
