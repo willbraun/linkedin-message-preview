@@ -8,9 +8,7 @@
     bubble.textContent = '';
     shadowRoot.appendChild(bubble);
     document.body.appendChild(shadowRoot);
-    const handleMouseOver = (message) => {
-        bubble.textContent = message;
-    };
+    const root = document.documentElement;
     const setupMutationObserver = () => {
         const sidebar = document.querySelector('.msg-overlay-list-bubble__conversations-list');
         if (sidebar) {
@@ -20,7 +18,13 @@
                     var _a;
                     const textElement = box.querySelector('.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2');
                     const message = (_a = textElement === null || textElement === void 0 ? void 0 : textElement.textContent) !== null && _a !== void 0 ? _a : '';
-                    box.addEventListener('mouseover', () => handleMouseOver(message));
+                    box.addEventListener('mouseover', () => {
+                        const rect = box.getBoundingClientRect();
+                        root.style.setProperty('--bubble-x', `${rect.x - 420}px`);
+                        root.style.setProperty('--bubble-y', `${rect.y - 100 + (rect.height / 2)}px`);
+                        console.log(rect);
+                        bubble.textContent = message;
+                    });
                 });
             });
             const observerConfig = { childList: true };

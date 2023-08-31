@@ -6,10 +6,7 @@
 	bubble.textContent = ''
 	shadowRoot.appendChild(bubble)
 	document.body.appendChild(shadowRoot)
-
-	const handleMouseOver = (message: string) => {
-		bubble.textContent = message
-	}
+	const root = document.documentElement
 
 	const setupMutationObserver = () => {
 		const sidebar = document.querySelector('.msg-overlay-list-bubble__conversations-list')
@@ -23,7 +20,13 @@
 					)
 					const message = textElement?.textContent ?? ''
 
-					box.addEventListener('mouseover', () => handleMouseOver(message))
+					box.addEventListener('mouseover', () => {
+						const rect = box.getBoundingClientRect()
+						root.style.setProperty('--bubble-x', `${rect.x - 420}px` )
+						root.style.setProperty('--bubble-y', `${rect.y - 100 + (rect.height / 2)}px` )
+						console.log(rect)
+						bubble.textContent = message
+					})
 				})
 			})
 
