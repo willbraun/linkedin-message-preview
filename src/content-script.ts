@@ -22,8 +22,8 @@
 
 					box.addEventListener('mouseover', () => {
 						const rect = box.getBoundingClientRect()
-						root.style.setProperty('--bubble-x', `${rect.x - 420}px` )
-						root.style.setProperty('--bubble-y', `${rect.y - 100 + (rect.height / 2)}px` )
+						root.style.setProperty('--bubble-x', `${rect.x - 420}px`)
+						root.style.setProperty('--bubble-y', `${rect.y - 100 + rect.height / 2}px`)
 						console.log(rect)
 						bubble.textContent = message
 					})
