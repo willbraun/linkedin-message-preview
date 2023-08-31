@@ -18,10 +18,10 @@
 			const boxes = sidebar.children
 			const mutationObserver = new MutationObserver(_ => {
 				Array.from(boxes).forEach(box => {
-					const text = box.querySelector(
+					const textElement = box.querySelector(
 						'.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2'
 					)
-					const message = text?.textContent ?? ''
+					const message = textElement?.textContent ?? ''
 
 					box.addEventListener('mouseover', () => handleMouseOver(message))
 				})
