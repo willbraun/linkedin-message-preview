@@ -3,27 +3,27 @@
 	const shadowRoot = document.createElement('div').attachShadow({ mode: 'open' })
 	const bubble = document.createElement('div')
 	bubble.classList.add('message-preview-bubble')
-	bubble.innerHTML = ''
+	bubble.textContent = ''
 	shadowRoot.appendChild(bubble)
 	document.body.appendChild(shadowRoot)
 
-	const handleHover = (message: string) => {
-		console.log(message)
-		bubble.innerHTML = `<p>${message}</p>`
+	const handleMouseOver = (message: string) => {
+		bubble.textContent = message
 	}
 
 	const setupMutationObserver = () => {
 		const sidebar = document.querySelector('.msg-overlay-list-bubble__conversations-list')
 
 		if (sidebar) {
-			const mutationObserver = new MutationObserver(mutationsList => {
-				console.log(mutationsList)
-				mutationsList.forEach(mutation => {
-					const addedElements = Array.from(mutation.addedNodes).filter(node => node.nodeType === Node.ELEMENT_NODE)
+			const boxes = sidebar.children
+			const mutationObserver = new MutationObserver(_ => {
+				Array.from(boxes).forEach(box => {
+					const text = box.querySelector(
+						'.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2'
+					)
+					const message = text?.textContent ?? ''
 
-					console.log('Added elements:', addedElements)
-
-					addedElements.forEach(element => element.addEventListener('hover', () => handleHover('Test')))
+					box.addEventListener('mouseover', () => handleMouseOver(message))
 				})
 			})
 
