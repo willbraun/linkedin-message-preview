@@ -2,8 +2,10 @@
 	const shadowRoot = document.createElement('div').attachShadow({ mode: 'open' })
 	const bubble = document.createElement('div')
 	bubble.classList.add('message-preview-bubble')
+	const margin = 20
+	const windowHeight = window.innerHeight
 
-	const maxHeight = window.innerHeight - 40
+	const maxHeight = windowHeight - margin * 2
 	bubble.style.setProperty('max-height', `${maxHeight}px`)
 	const fontSize = '24px'
 	bubble.style.setProperty('font-size', fontSize)
@@ -11,7 +13,6 @@
 
 	shadowRoot.appendChild(bubble)
 	document.body.appendChild(shadowRoot)
-	const root = document.documentElement
 
 	const setupMouseOver = (sidebar: Element) => {
 		const setupEventListeners = () => {
@@ -22,27 +23,32 @@
 				)
 				const message = textElement?.textContent ?? ''
 
-				box.addEventListener('mouseover', () => {
+				box.addEventListener('mouseenter', () => {
 					bubble.textContent = message
-					bubble.style.setProperty('height', 'fit-content')
 					bubble.style.setProperty('max-width', `400px`)
-					bubble.style.setProperty('font-size', fontSize)
 
-					const bubbleRect = bubble.getBoundingClientRect()
+					const bubbleRect1 = bubble.getBoundingClientRect()
 					const boxRect = box.getBoundingClientRect()
 
-					if (bubbleRect.height === maxHeight) {
-						bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - 40}px`)
-						root.style.setProperty('--bubble-x', '20px')
-						root.style.setProperty('--bubble-y', '20px')
+					if (bubbleRect1.height === maxHeight) {
+						bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 2}px`)
+						bubble.style.setProperty('left', `${margin}px`)
+						bubble.style.setProperty('top', `${margin}px`)
 
-						while (bubble.scrollHeight > bubbleRect.height) {
+						while (bubble.scrollHeight > bubbleRect1.height) {
 							const currentFontSize = Number(bubble.style.fontSize.split('px')[0])
 							bubble.style.setProperty('font-size', `${currentFontSize - 1}px`)
 						}
 					} else {
-						root.style.setProperty('--bubble-x', `${boxRect.x - bubbleRect.width - 20}px`)
-						root.style.setProperty('--bubble-y', `${boxRect.y + (boxRect.height - bubbleRect.height) / 2}px`)
+						bubble.style.setProperty('font-size', fontSize)
+						bubble.style.setProperty('left', `${boxRect.x - bubbleRect1.width - margin}px`)
+						bubble.style.setProperty('top', `${boxRect.y + (boxRect.height - bubbleRect1.height) / 2}px`)
+						
+						const bubbleRect2 = bubble.getBoundingClientRect()
+
+						if (bubbleRect2.y + bubbleRect2.height > windowHeight - margin) {
+							bubble.style.setProperty('top', `${windowHeight - bubbleRect2.height - margin}px`)
+						}
 					}
 				})
 			})

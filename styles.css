@@ -1,12 +1,5 @@
-:root {
-	--bubble-x: 0;
-	--bubble-y: 0;
-}
-
 .message-preview-bubble {
 	position: fixed;
-	left: var(--bubble-x);
-	top: var(--bubble-y);
 	padding: 1.2rem;
 	width: fit-content;
 	max-width: 400px;
