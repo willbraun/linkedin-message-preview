@@ -6,11 +6,11 @@
     bubble.classList.add('message-preview-bubble');
     const margin = 20;
     const windowHeight = window.innerHeight;
+    bubble.textContent = '';
     const maxHeight = windowHeight - margin * 2;
     bubble.style.setProperty('max-height', `${maxHeight}px`);
     const fontSize = '24px';
     bubble.style.setProperty('font-size', fontSize);
-    bubble.textContent = '';
     shadowRoot.appendChild(bubble);
     document.body.appendChild(shadowRoot);
     const setupMouseOver = (sidebar) => {
