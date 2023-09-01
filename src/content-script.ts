@@ -43,7 +43,7 @@
 						bubble.style.setProperty('font-size', fontSize)
 						bubble.style.setProperty('left', `${boxRect.x - bubbleRect1.width - margin}px`)
 						bubble.style.setProperty('top', `${boxRect.y + (boxRect.height - bubbleRect1.height) / 2}px`)
-						
+
 						const bubbleRect2 = bubble.getBoundingClientRect()
 
 						if (bubbleRect2.y + bubbleRect2.height > windowHeight - margin) {
