@@ -59,7 +59,15 @@
 		mutationObserver.observe(sidebar, { childList: true })
 	}
 
+	let count = 0
+
 	const intervalId = setInterval(() => {
+		count++
+		const sidebarHeader = document.querySelector('.msg-overlay-bubble-header')
+		if (!sidebarHeader && count === 15) {
+			clearInterval(intervalId)
+		}
+
 		const sidebar = document.querySelector('.msg-overlay-list-bubble__conversations-list')
 		if (sidebar) {
 			clearInterval(intervalId)
