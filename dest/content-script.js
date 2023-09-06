@@ -27,7 +27,7 @@
                     const boxRect = box.getBoundingClientRect();
                     if (bubbleRect1.height === maxHeight) {
                         bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 2}px`);
-                        bubble.style.setProperty('left', `${margin}px`);
+                        bubble.style.setProperty('right', `${margin}px`);
                         bubble.style.setProperty('top', `${margin}px`);
                         while (bubble.scrollHeight > bubbleRect1.height) {
                             const currentFontSize = Number(bubble.style.fontSize.split('px')[0]);
@@ -36,13 +36,17 @@
                     }
                     else {
                         bubble.style.setProperty('font-size', fontSize);
-                        bubble.style.setProperty('left', `${boxRect.x - bubbleRect1.width - margin}px`);
+                        bubble.style.setProperty('right', `${boxRect.width + margin}px`);
                         bubble.style.setProperty('top', `${boxRect.y + (boxRect.height - bubbleRect1.height) / 2}px`);
                         const bubbleRect2 = bubble.getBoundingClientRect();
                         if (bubbleRect2.y + bubbleRect2.height > windowHeight - margin) {
                             bubble.style.setProperty('top', `${windowHeight - bubbleRect2.height - margin}px`);
                         }
                     }
+                    bubble.classList.add('show-bubble');
+                    box.addEventListener('mouseleave', () => {
+                        bubble.classList.remove('show-bubble');
+                    });
                 });
             });
         };
