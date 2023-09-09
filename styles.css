@@ -8,7 +8,7 @@
 	border-radius: 0.8rem;
 	box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
 	z-index: 1000;
-	display: none;
+	visibility: hidden;
 }
 
 html.theme--mercado-dark,
@@ -21,5 +21,5 @@ html.theme--dark {
 }
 
 .show-bubble {
-	display: block;
+	visibility: visible;
 }
