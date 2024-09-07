@@ -6,6 +6,7 @@
     bubble.classList.add('message-preview-bubble');
     const margin = 20;
     const windowHeight = window.innerHeight;
+    console.log('Hello from LinkedIn Message Preview Extension!');
     bubble.textContent = '';
     const maxHeight = windowHeight - margin * 2;
     bubble.style.setProperty('max-height', `${maxHeight}px`);
@@ -15,7 +16,7 @@
     document.body.appendChild(shadowRoot);
     const setupMouseOver = (sidebar) => {
         const setupEventListeners = () => {
-            const boxes = sidebar.children;
+            const boxes = sidebar.querySelectorAll('.msg-conversation-listitem__link');
             Array.from(boxes).forEach(box => {
                 var _a;
                 const textElement = box.querySelector('.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2');
@@ -57,20 +58,22 @@
         };
         setupEventListeners();
         const mutationObserver = new MutationObserver(_ => setupEventListeners());
-        mutationObserver.observe(sidebar, { childList: true });
+        mutationObserver.observe(sidebar, { childList: true, subtree: true });
     };
     let count1 = 0;
     let count2 = 0;
     let clickHandlerAdded = false;
     const checkForMessages = (intervalId) => {
+        console.log(intervalId);
         if (!clickHandlerAdded) {
+            console.log('adding click handler');
             const sidebarHeader = document.querySelector('.msg-overlay-bubble-header');
             if (sidebarHeader) {
                 sidebarHeader.addEventListener('click', findSidebar, { capture: true });
                 clickHandlerAdded = true;
             }
         }
-        const sidebar = document.querySelector('.msg-overlay-list-bubble__conversations-list');
+        const sidebar = document.querySelector('.msg-overlay-list-bubble__default-conversation-container');
         if (sidebar) {
             setupMouseOver(sidebar);
             clearInterval(intervalId);
