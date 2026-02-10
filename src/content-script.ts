@@ -1,5 +1,6 @@
 ;(function () {
-	const shadowRoot = document.createElement('div').attachShadow({ mode: 'open' })
+	const host = document.createElement('div')
+	const shadowRoot = host.attachShadow({ mode: 'open' })
 	const bubble = document.createElement('div')
 	bubble.classList.add('message-preview-bubble')
 	const margin = 20
@@ -11,14 +12,48 @@
 	const fontSize = '24px'
 	bubble.style.setProperty('font-size', fontSize)
 
+	// Add styles to the shadow DOM
+	const style = document.createElement('style')
+	style.textContent = `
+		.message-preview-bubble {
+			position: fixed;
+			padding: 1.2rem;
+			width: fit-content;
+			max-width: 400px;
+			height: fit-content;
+			background-color: #fff;
+			border-radius: 0.8rem;
+			box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
+			z-index: 1000;
+			visibility: hidden;
+		}
+
+		html.theme--mercado-dark,
+		html.theme--dark {
+			.message-preview-bubble {
+				background-color: #15171a;
+				color: #e4e4e4;
+				box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
+			}
+		}
+
+		.show-bubble {
+			visibility: visible;
+		}
+  `
+
+	shadowRoot.appendChild(style)
 	shadowRoot.appendChild(bubble)
-	document.body.appendChild(shadowRoot)
+	document.body.appendChild(host)
+
+	let linkedInShadowRoot: ShadowRoot | null | undefined = null
 
 	const setUpEventListeners = (sidebar: Element) => {
-		const boxes = sidebar.querySelectorAll('.msg-conversation-listitem__link')
+		const boxes = sidebar.querySelectorAll('.entry-point')
+
 		Array.from(boxes).forEach(box => {
 			const textElement = box.querySelector(
-				'.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2'
+				'.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2',
 			)
 			const message = textElement?.textContent ?? ''
 
@@ -31,10 +66,10 @@
 				const bubbleRect1 = bubble.getBoundingClientRect()
 				const boxRect = box.getBoundingClientRect()
 
-				bubble.style.setProperty('right', `${boxRect.width + margin}px`)
+				bubble.style.setProperty('right', `${boxRect.width + 2 * margin}px`)
 
-				if (bubbleRect1.height === maxHeight) {
-					bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 2}px`)
+				if (bubbleRect1.height >= maxHeight) {
+					bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 4}px`)
 					bubble.style.setProperty('top', `${margin}px`)
 
 					// shrink font until bubble fits on screen
@@ -75,7 +110,8 @@
 	}
 
 	const findSidebar = (intervalId: number) => {
-		const sidebar = document.querySelector('.msg-overlay-list-bubble__default-conversation-container')
+		const sidebar = linkedInShadowRoot?.querySelector('.msg-overlay-list-bubble__default-conversation-container')
+
 		if (sidebar) {
 			setUpMouseOver(sidebar)
 			clearInterval(intervalId)
@@ -97,8 +133,13 @@
 
 	let clickHandlerAdded = false
 	const checkForSidebar = (intervalId: number) => {
+		linkedInShadowRoot = document.querySelector('#interop-outlet')?.shadowRoot
+		if (!linkedInShadowRoot) {
+			return
+		}
+
 		if (!clickHandlerAdded) {
-			const sidebarHeader = document.querySelector('.msg-overlay-bubble-header')
+			const sidebarHeader = linkedInShadowRoot.querySelector('.msg-overlay-bubble-header__badge-container')
 			if (sidebarHeader) {
 				sidebarHeader.addEventListener('click', setUpSidebarOnHeaderClick, { capture: true })
 				clickHandlerAdded = true
