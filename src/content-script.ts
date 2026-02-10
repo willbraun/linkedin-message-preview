@@ -25,7 +25,7 @@
 	}
 
 	// ========================================
-	// Shadow DOM Setup
+	// Shadow DOM Setup for the Bubble
 	// ========================================
 	const createBubbleElement = () => {
 		const host = document.createElement('div')
