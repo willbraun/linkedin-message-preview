@@ -1,172 +1,263 @@
 ;(function () {
-	const host = document.createElement('div')
-	const shadowRoot = host.attachShadow({ mode: 'open' })
-	const bubble = document.createElement('div')
-	bubble.classList.add('message-preview-bubble')
-	const margin = 20
-	const windowHeight = window.innerHeight
+	// ========================================
+	// Constants
+	// ========================================
+	const SELECTORS = {
+		SHADOW_HOST: '#interop-outlet',
+		SIDEBAR_CONTAINER: '.msg-overlay-list-bubble__default-conversation-container',
+		SIDEBAR_HEADER: '.msg-overlay-bubble-header__badge-container',
+		MESSAGE_BOX: '.entry-point',
+		MESSAGE_SNIPPET: '.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2',
+	}
 
-	bubble.textContent = ''
-	const maxHeight = windowHeight - margin * 2
-	bubble.style.setProperty('max-height', `${maxHeight}px`)
-	const fontSize = '24px'
-	bubble.style.setProperty('font-size', fontSize)
+	const MARGIN = 20
+	const WINDOW_HEIGHT = window.innerHeight
+	const MAX_HEIGHT = WINDOW_HEIGHT - MARGIN * 2
+	const DEFAULT_FONT_SIZE = '24px'
 
-	// Add styles to the shadow DOM
-	const style = document.createElement('style')
-	style.textContent = `
-		.message-preview-bubble {
-			position: fixed;
-			padding: 1.2rem;
-			width: fit-content;
-			max-width: 400px;
-			height: fit-content;
-			background-color: #fff;
-			border-radius: 0.8rem;
-			box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
-			z-index: 1000;
-			visibility: hidden;
-		}
+	const POLLING_CONFIG = {
+		fastInterval: 1000,
+		fastRetries: 20,
+		slowInterval: 5000,
+		slowRetries: 20,
+		sidebarCheckInterval: 500,
+		sidebarCheckRetries: 10,
+	}
 
-		html.theme--mercado-dark,
-		html.theme--dark {
+	// ========================================
+	// Shadow DOM Setup
+	// ========================================
+	const createBubbleElement = () => {
+		const host = document.createElement('div')
+		const shadowRoot = host.attachShadow({ mode: 'open' })
+
+		const style = document.createElement('style')
+		style.textContent = `
 			.message-preview-bubble {
-				background-color: #15171a;
-				color: #e4e4e4;
-				box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
+				position: fixed;
+				padding: 1.2rem;
+				width: fit-content;
+				max-width: 400px;
+				height: fit-content;
+				background-color: #fff;
+				border-radius: 0.8rem;
+				box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
+				z-index: 1000;
+				visibility: hidden;
+				overflow-y: auto;
 			}
+
+			html.theme--mercado-dark,
+			html.theme--dark {
+				.message-preview-bubble {
+					background-color: #15171a;
+					color: #e4e4e4;
+					box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
+				}
+			}
+
+			.show-bubble {
+				visibility: visible;
+			}
+		`
+
+		const bubble = document.createElement('div')
+		bubble.classList.add('message-preview-bubble')
+		bubble.style.setProperty('max-height', `${MAX_HEIGHT}px`)
+		bubble.style.setProperty('font-size', DEFAULT_FONT_SIZE)
+
+		shadowRoot.appendChild(style)
+		shadowRoot.appendChild(bubble)
+		document.body.appendChild(host)
+
+		return bubble
+	}
+
+	const bubble = createBubbleElement()
+
+	// ========================================
+	// Positioning Logic
+	// ========================================
+	const positionBubble = (boxRect: DOMRect) => {
+		bubble.style.setProperty('max-width', '400px')
+		bubble.style.setProperty('font-size', DEFAULT_FONT_SIZE)
+		bubble.style.setProperty('right', `${boxRect.width + 2 * MARGIN}px`)
+
+		const bubbleRect = bubble.getBoundingClientRect()
+
+		if (bubbleRect.height >= MAX_HEIGHT) {
+			handleOverflowBubble(bubble, boxRect, bubbleRect)
+		} else {
+			handleNormalBubble(bubble, boxRect, bubbleRect)
 		}
+	}
 
-		.show-bubble {
-			visibility: visible;
+	const handleOverflowBubble = (bubble: HTMLElement, boxRect: DOMRect, bubbleRect: DOMRect) => {
+		bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - MARGIN * 4}px`)
+		bubble.style.setProperty('top', `${MARGIN}px`)
+		shrinkFontToFit(bubble, bubbleRect)
+	}
+
+	const shrinkFontToFit = (bubble: HTMLElement, bubbleRect: DOMRect) => {
+		while (bubble.scrollHeight > bubbleRect.height) {
+			const currentFontSize = Number(bubble.style.fontSize.replace('px', ''))
+			bubble.style.setProperty('font-size', `${currentFontSize - 1}px`)
 		}
-  `
+	}
 
-	shadowRoot.appendChild(style)
-	shadowRoot.appendChild(bubble)
-	document.body.appendChild(host)
+	const handleNormalBubble = (bubble: HTMLElement, boxRect: DOMRect, bubbleRect: DOMRect) => {
+		const centeredTop = boxRect.y + (boxRect.height - bubbleRect.height) / 2
+		bubble.style.setProperty('top', `${centeredTop}px`)
 
-	let linkedInShadowRoot: ShadowRoot | null | undefined = null
+		const updatedRect = bubble.getBoundingClientRect()
+		constrainToViewport(bubble, updatedRect)
+	}
 
-	const setUpEventListeners = (sidebar: Element) => {
-		const boxes = sidebar.querySelectorAll('.entry-point')
+	const constrainToViewport = (bubble: HTMLElement, bubbleRect: DOMRect) => {
+		if (bubbleRect.y < MARGIN) {
+			bubble.style.setProperty('top', `${MARGIN}px`)
+		} else if (bubbleRect.y + bubbleRect.height > WINDOW_HEIGHT - MARGIN) {
+			bubble.style.setProperty('top', `${WINDOW_HEIGHT - bubbleRect.height - MARGIN}px`)
+		}
+	}
+
+	// ========================================
+	// Event Handling
+	// ========================================
+	const processedBoxes = new WeakSet<Element>()
+
+	const extractMessage = (box: Element): string => {
+		const textElement = box.querySelector(SELECTORS.MESSAGE_SNIPPET)
+		return textElement?.textContent ?? ''
+	}
+
+	const attachEventListeners = (sidebar: Element) => {
+		const boxes = sidebar.querySelectorAll(SELECTORS.MESSAGE_BOX)
 
 		Array.from(boxes).forEach(box => {
-			const textElement = box.querySelector(
-				'.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2',
-			)
-			const message = textElement?.textContent ?? ''
+			if (processedBoxes.has(box)) return
+			processedBoxes.add(box)
 
-			// on mouseenter, calculate styles and show bubble
+			const message = extractMessage(box)
+
 			box.addEventListener('mouseenter', () => {
 				bubble.textContent = message
-				bubble.style.setProperty('max-width', `400px`)
-				bubble.style.setProperty('font-size', fontSize)
-
-				const bubbleRect1 = bubble.getBoundingClientRect()
 				const boxRect = box.getBoundingClientRect()
-
-				bubble.style.setProperty('right', `${boxRect.width + 2 * margin}px`)
-
-				if (bubbleRect1.height >= maxHeight) {
-					bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 4}px`)
-					bubble.style.setProperty('top', `${margin}px`)
-
-					// shrink font until bubble fits on screen
-					while (bubble.scrollHeight > bubbleRect1.height) {
-						const currentFontSize = Number(bubble.style.fontSize.split('px')[0])
-						bubble.style.setProperty('font-size', `${currentFontSize - 1}px`)
-					}
-				} else {
-					bubble.style.setProperty('top', `${boxRect.y + (boxRect.height - bubbleRect1.height) / 2}px`)
-
-					const bubbleRect2 = bubble.getBoundingClientRect()
-
-					// if bubble goes off top
-					if (bubbleRect2.y < margin) {
-						bubble.style.setProperty('top', `${margin}px`)
-					}
-
-					// if bubble goes off bottom
-					if (bubbleRect2.y + bubbleRect2.height > windowHeight - margin) {
-						bubble.style.setProperty('top', `${windowHeight - bubbleRect2.height - margin}px`)
-					}
-				}
-
+				positionBubble(boxRect)
 				bubble.classList.add('show-bubble')
 			})
 
-			// on mouseleave, hide bubble
 			box.addEventListener('mouseleave', () => {
 				bubble.classList.remove('show-bubble')
 			})
 		})
 	}
 
-	const setUpMouseOver = (sidebar: Element) => {
-		setUpEventListeners(sidebar)
-		const mutationObserver = new MutationObserver(_ => setUpEventListeners(sidebar))
-		mutationObserver.observe(sidebar, { childList: true, subtree: true })
+	const setupMutationObserver = (sidebar: Element) => {
+		attachEventListeners(sidebar)
+
+		const observer = new MutationObserver(() => {
+			attachEventListeners(sidebar)
+		})
+
+		observer.observe(sidebar, { childList: true, subtree: true })
 	}
 
-	const findSidebar = (intervalId: number) => {
-		const sidebar = linkedInShadowRoot?.querySelector('.msg-overlay-list-bubble__default-conversation-container')
-
-		if (sidebar) {
-			setUpMouseOver(sidebar)
-			clearInterval(intervalId)
-		}
-	}
-
-	const setUpSidebarOnHeaderClick = () => {
-		let sidebarCount = 0
-		const sidebarInterval = setInterval(() => {
-			findSidebar(sidebarInterval)
-			sidebarCount++
-
-			// messages tab is closed
-			if (sidebarCount === 10) {
-				clearInterval(sidebarInterval)
-			}
-		}, 500)
-	}
-
+	// ========================================
+	// LinkedIn DOM Querying
+	// ========================================
+	let linkedInShadowRoot: ShadowRoot | null = null
 	let clickHandlerAdded = false
-	const checkForSidebar = (intervalId: number) => {
-		linkedInShadowRoot = document.querySelector('#interop-outlet')?.shadowRoot
+
+	const findLinkedInShadowRoot = (): ShadowRoot | null => {
 		if (!linkedInShadowRoot) {
-			return
+			linkedInShadowRoot = document.querySelector(SELECTORS.SHADOW_HOST)?.shadowRoot ?? null
 		}
-
-		if (!clickHandlerAdded) {
-			const sidebarHeader = linkedInShadowRoot.querySelector('.msg-overlay-bubble-header__badge-container')
-			if (sidebarHeader) {
-				sidebarHeader.addEventListener('click', setUpSidebarOnHeaderClick, { capture: true })
-				clickHandlerAdded = true
-			}
-		}
-
-		findSidebar(intervalId)
+		return linkedInShadowRoot
 	}
 
-	// check every 1s, then every 5s, then give up after 20 tries of each
-	let count1 = 0
-	let count2 = 0
-	const intervalId1 = setInterval(() => {
-		checkForSidebar(intervalId1)
-		count1++
+	const findSidebar = (): Element | null => {
+		const shadowRoot = findLinkedInShadowRoot()
+		return shadowRoot?.querySelector(SELECTORS.SIDEBAR_CONTAINER) ?? null
+	}
 
-		if (count1 === 20) {
-			clearInterval(intervalId1)
+	const setupSidebarHeaderClickListener = () => {
+		if (clickHandlerAdded) return
 
-			const intervalId2 = setInterval(() => {
-				checkForSidebar(intervalId2)
-				count2++
+		const shadowRoot = findLinkedInShadowRoot()
+		const sidebarHeader = shadowRoot?.querySelector(SELECTORS.SIDEBAR_HEADER)
 
-				if (count2 === 20) {
-					clearInterval(intervalId2)
-				}
-			}, 5000)
+		if (sidebarHeader) {
+			sidebarHeader.addEventListener('click', () => pollForSidebar(), { capture: true })
+			clickHandlerAdded = true
 		}
-	}, 1000)
+	}
+
+	// ========================================
+	// Initialization & Polling
+	// ========================================
+	const pollForSidebar = () => {
+		let attempts = 0
+		const intervalId = setInterval(() => {
+			const sidebar = findSidebar()
+
+			if (sidebar) {
+				setupMutationObserver(sidebar)
+				clearInterval(intervalId)
+			}
+
+			attempts++
+			if (attempts >= POLLING_CONFIG.sidebarCheckRetries) {
+				clearInterval(intervalId)
+			}
+		}, POLLING_CONFIG.sidebarCheckInterval)
+	}
+
+	const checkForLinkedIn = (intervalId: number): boolean => {
+		const shadowRoot = findLinkedInShadowRoot()
+		if (!shadowRoot) return false
+
+		setupSidebarHeaderClickListener()
+
+		const sidebar = findSidebar()
+		if (sidebar) {
+			setupMutationObserver(sidebar)
+			clearInterval(intervalId)
+			return true
+		}
+
+		return false
+	}
+
+	const startPolling = () => {
+		let fastAttempts = 0
+
+		const fastPoll = setInterval(() => {
+			checkForLinkedIn(fastPoll)
+			fastAttempts++
+
+			if (fastAttempts >= POLLING_CONFIG.fastRetries) {
+				clearInterval(fastPoll)
+				startSlowPolling()
+			}
+		}, POLLING_CONFIG.fastInterval)
+	}
+
+	const startSlowPolling = () => {
+		let slowAttempts = 0
+
+		const slowPoll = setInterval(() => {
+			checkForLinkedIn(slowPoll)
+			slowAttempts++
+
+			if (slowAttempts >= POLLING_CONFIG.slowRetries) {
+				clearInterval(slowPoll)
+			}
+		}, POLLING_CONFIG.slowInterval)
+	}
+
+	// ========================================
+	// Entry Point
+	// ========================================
+	startPolling()
 })()

@@ -1,147 +1,227 @@
 "use strict";
 ;
 (function () {
-    const host = document.createElement('div');
-    const shadowRoot = host.attachShadow({ mode: 'open' });
-    const bubble = document.createElement('div');
-    bubble.classList.add('message-preview-bubble');
-    const margin = 20;
-    const windowHeight = window.innerHeight;
-    bubble.textContent = '';
-    const maxHeight = windowHeight - margin * 2;
-    bubble.style.setProperty('max-height', `${maxHeight}px`);
-    const fontSize = '24px';
-    bubble.style.setProperty('font-size', fontSize);
-    // Add styles to the shadow DOM
-    const style = document.createElement('style');
-    style.textContent = `
-		.message-preview-bubble {
-			position: fixed;
-			padding: 1.2rem;
-			width: fit-content;
-			max-width: 400px;
-			height: fit-content;
-			background-color: #fff;
-			border-radius: 0.8rem;
-			box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
-			z-index: 1000;
-			visibility: hidden;
-		}
-
-		html.theme--mercado-dark,
-		html.theme--dark {
+    // ========================================
+    // Constants
+    // ========================================
+    const SELECTORS = {
+        SHADOW_HOST: '#interop-outlet',
+        SIDEBAR_CONTAINER: '.msg-overlay-list-bubble__default-conversation-container',
+        SIDEBAR_HEADER: '.msg-overlay-bubble-header__badge-container',
+        MESSAGE_BOX: '.entry-point',
+        MESSAGE_SNIPPET: '.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2',
+    };
+    const MARGIN = 20;
+    const WINDOW_HEIGHT = window.innerHeight;
+    const MAX_HEIGHT = WINDOW_HEIGHT - MARGIN * 2;
+    const DEFAULT_FONT_SIZE = '24px';
+    const POLLING_CONFIG = {
+        fastInterval: 1000,
+        fastRetries: 20,
+        slowInterval: 5000,
+        slowRetries: 20,
+        sidebarCheckInterval: 500,
+        sidebarCheckRetries: 10,
+    };
+    // ========================================
+    // Shadow DOM Setup
+    // ========================================
+    const createBubbleElement = () => {
+        const host = document.createElement('div');
+        const shadowRoot = host.attachShadow({ mode: 'open' });
+        const style = document.createElement('style');
+        style.textContent = `
 			.message-preview-bubble {
-				background-color: #15171a;
-				color: #e4e4e4;
-				box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
+				position: fixed;
+				padding: 1.2rem;
+				width: fit-content;
+				max-width: 400px;
+				height: fit-content;
+				background-color: #fff;
+				border-radius: 0.8rem;
+				box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
+				z-index: 1000;
+				visibility: hidden;
+				overflow-y: auto;
 			}
-		}
 
-		.show-bubble {
-			visibility: visible;
-		}
-  `;
-    shadowRoot.appendChild(style);
-    shadowRoot.appendChild(bubble);
-    document.body.appendChild(host);
-    let linkedInShadowRoot = null;
-    const setUpEventListeners = (sidebar) => {
-        const boxes = sidebar.querySelectorAll('.entry-point');
+			html.theme--mercado-dark,
+			html.theme--dark {
+				.message-preview-bubble {
+					background-color: #15171a;
+					color: #e4e4e4;
+					box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
+				}
+			}
+
+			.show-bubble {
+				visibility: visible;
+			}
+		`;
+        const bubble = document.createElement('div');
+        bubble.classList.add('message-preview-bubble');
+        bubble.style.setProperty('max-height', `${MAX_HEIGHT}px`);
+        bubble.style.setProperty('font-size', DEFAULT_FONT_SIZE);
+        shadowRoot.appendChild(style);
+        shadowRoot.appendChild(bubble);
+        document.body.appendChild(host);
+        return bubble;
+    };
+    const bubble = createBubbleElement();
+    // ========================================
+    // Positioning Logic
+    // ========================================
+    const positionBubble = (boxRect) => {
+        bubble.style.setProperty('max-width', '400px');
+        bubble.style.setProperty('font-size', DEFAULT_FONT_SIZE);
+        bubble.style.setProperty('right', `${boxRect.width + 2 * MARGIN}px`);
+        const bubbleRect = bubble.getBoundingClientRect();
+        if (bubbleRect.height >= MAX_HEIGHT) {
+            handleOverflowBubble(bubble, boxRect, bubbleRect);
+        }
+        else {
+            handleNormalBubble(bubble, boxRect, bubbleRect);
+        }
+    };
+    const handleOverflowBubble = (bubble, boxRect, bubbleRect) => {
+        bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - MARGIN * 4}px`);
+        bubble.style.setProperty('top', `${MARGIN}px`);
+        shrinkFontToFit(bubble, bubbleRect);
+    };
+    const shrinkFontToFit = (bubble, bubbleRect) => {
+        while (bubble.scrollHeight > bubbleRect.height) {
+            const currentFontSize = Number(bubble.style.fontSize.replace('px', ''));
+            bubble.style.setProperty('font-size', `${currentFontSize - 1}px`);
+        }
+    };
+    const handleNormalBubble = (bubble, boxRect, bubbleRect) => {
+        const centeredTop = boxRect.y + (boxRect.height - bubbleRect.height) / 2;
+        bubble.style.setProperty('top', `${centeredTop}px`);
+        const updatedRect = bubble.getBoundingClientRect();
+        constrainToViewport(bubble, updatedRect);
+    };
+    const constrainToViewport = (bubble, bubbleRect) => {
+        if (bubbleRect.y < MARGIN) {
+            bubble.style.setProperty('top', `${MARGIN}px`);
+        }
+        else if (bubbleRect.y + bubbleRect.height > WINDOW_HEIGHT - MARGIN) {
+            bubble.style.setProperty('top', `${WINDOW_HEIGHT - bubbleRect.height - MARGIN}px`);
+        }
+    };
+    // ========================================
+    // Event Handling
+    // ========================================
+    const processedBoxes = new WeakSet();
+    const extractMessage = (box) => {
+        var _a;
+        const textElement = box.querySelector(SELECTORS.MESSAGE_SNIPPET);
+        return (_a = textElement === null || textElement === void 0 ? void 0 : textElement.textContent) !== null && _a !== void 0 ? _a : '';
+    };
+    const attachEventListeners = (sidebar) => {
+        const boxes = sidebar.querySelectorAll(SELECTORS.MESSAGE_BOX);
         Array.from(boxes).forEach(box => {
-            var _a;
-            const textElement = box.querySelector('.msg-overlay-list-bubble__message-snippet, .msg-overlay-list-bubble__message-snippet--v2');
-            const message = (_a = textElement === null || textElement === void 0 ? void 0 : textElement.textContent) !== null && _a !== void 0 ? _a : '';
-            // on mouseenter, calculate styles and show bubble
+            if (processedBoxes.has(box))
+                return;
+            processedBoxes.add(box);
+            const message = extractMessage(box);
             box.addEventListener('mouseenter', () => {
                 bubble.textContent = message;
-                bubble.style.setProperty('max-width', `400px`);
-                bubble.style.setProperty('font-size', fontSize);
-                const bubbleRect1 = bubble.getBoundingClientRect();
                 const boxRect = box.getBoundingClientRect();
-                bubble.style.setProperty('right', `${boxRect.width + 2 * margin}px`);
-                if (bubbleRect1.height >= maxHeight) {
-                    bubble.style.setProperty('max-width', `${window.innerWidth - boxRect.width - margin * 4}px`);
-                    bubble.style.setProperty('top', `${margin}px`);
-                    // shrink font until bubble fits on screen
-                    while (bubble.scrollHeight > bubbleRect1.height) {
-                        const currentFontSize = Number(bubble.style.fontSize.split('px')[0]);
-                        bubble.style.setProperty('font-size', `${currentFontSize - 1}px`);
-                    }
-                }
-                else {
-                    bubble.style.setProperty('top', `${boxRect.y + (boxRect.height - bubbleRect1.height) / 2}px`);
-                    const bubbleRect2 = bubble.getBoundingClientRect();
-                    // if bubble goes off top
-                    if (bubbleRect2.y < margin) {
-                        bubble.style.setProperty('top', `${margin}px`);
-                    }
-                    // if bubble goes off bottom
-                    if (bubbleRect2.y + bubbleRect2.height > windowHeight - margin) {
-                        bubble.style.setProperty('top', `${windowHeight - bubbleRect2.height - margin}px`);
-                    }
-                }
+                positionBubble(boxRect);
                 bubble.classList.add('show-bubble');
             });
-            // on mouseleave, hide bubble
             box.addEventListener('mouseleave', () => {
                 bubble.classList.remove('show-bubble');
             });
         });
     };
-    const setUpMouseOver = (sidebar) => {
-        setUpEventListeners(sidebar);
-        const mutationObserver = new MutationObserver(_ => setUpEventListeners(sidebar));
-        mutationObserver.observe(sidebar, { childList: true, subtree: true });
+    const setupMutationObserver = (sidebar) => {
+        attachEventListeners(sidebar);
+        const observer = new MutationObserver(() => {
+            attachEventListeners(sidebar);
+        });
+        observer.observe(sidebar, { childList: true, subtree: true });
     };
-    const findSidebar = (intervalId) => {
-        const sidebar = linkedInShadowRoot === null || linkedInShadowRoot === void 0 ? void 0 : linkedInShadowRoot.querySelector('.msg-overlay-list-bubble__default-conversation-container');
-        if (sidebar) {
-            setUpMouseOver(sidebar);
-            clearInterval(intervalId);
-        }
-    };
-    const setUpSidebarOnHeaderClick = () => {
-        let sidebarCount = 0;
-        const sidebarInterval = setInterval(() => {
-            findSidebar(sidebarInterval);
-            sidebarCount++;
-            // messages tab is closed
-            if (sidebarCount === 10) {
-                clearInterval(sidebarInterval);
-            }
-        }, 500);
-    };
+    // ========================================
+    // LinkedIn DOM Querying
+    // ========================================
+    let linkedInShadowRoot = null;
     let clickHandlerAdded = false;
-    const checkForSidebar = (intervalId) => {
-        var _a;
-        linkedInShadowRoot = (_a = document.querySelector('#interop-outlet')) === null || _a === void 0 ? void 0 : _a.shadowRoot;
+    const findLinkedInShadowRoot = () => {
+        var _a, _b;
         if (!linkedInShadowRoot) {
-            return;
+            linkedInShadowRoot = (_b = (_a = document.querySelector(SELECTORS.SHADOW_HOST)) === null || _a === void 0 ? void 0 : _a.shadowRoot) !== null && _b !== void 0 ? _b : null;
         }
-        if (!clickHandlerAdded) {
-            const sidebarHeader = linkedInShadowRoot.querySelector('.msg-overlay-bubble-header__badge-container');
-            if (sidebarHeader) {
-                sidebarHeader.addEventListener('click', setUpSidebarOnHeaderClick, { capture: true });
-                clickHandlerAdded = true;
-            }
-        }
-        findSidebar(intervalId);
+        return linkedInShadowRoot;
     };
-    // check every 1s, then every 5s, then give up after 20 tries of each
-    let count1 = 0;
-    let count2 = 0;
-    const intervalId1 = setInterval(() => {
-        checkForSidebar(intervalId1);
-        count1++;
-        if (count1 === 20) {
-            clearInterval(intervalId1);
-            const intervalId2 = setInterval(() => {
-                checkForSidebar(intervalId2);
-                count2++;
-                if (count2 === 20) {
-                    clearInterval(intervalId2);
-                }
-            }, 5000);
+    const findSidebar = () => {
+        var _a;
+        const shadowRoot = findLinkedInShadowRoot();
+        return (_a = shadowRoot === null || shadowRoot === void 0 ? void 0 : shadowRoot.querySelector(SELECTORS.SIDEBAR_CONTAINER)) !== null && _a !== void 0 ? _a : null;
+    };
+    const setupSidebarHeaderClickListener = () => {
+        if (clickHandlerAdded)
+            return;
+        const shadowRoot = findLinkedInShadowRoot();
+        const sidebarHeader = shadowRoot === null || shadowRoot === void 0 ? void 0 : shadowRoot.querySelector(SELECTORS.SIDEBAR_HEADER);
+        if (sidebarHeader) {
+            sidebarHeader.addEventListener('click', () => pollForSidebar(), { capture: true });
+            clickHandlerAdded = true;
         }
-    }, 1000);
+    };
+    // ========================================
+    // Initialization & Polling
+    // ========================================
+    const pollForSidebar = () => {
+        let attempts = 0;
+        const intervalId = setInterval(() => {
+            const sidebar = findSidebar();
+            if (sidebar) {
+                setupMutationObserver(sidebar);
+                clearInterval(intervalId);
+            }
+            attempts++;
+            if (attempts >= POLLING_CONFIG.sidebarCheckRetries) {
+                clearInterval(intervalId);
+            }
+        }, POLLING_CONFIG.sidebarCheckInterval);
+    };
+    const checkForLinkedIn = (intervalId) => {
+        const shadowRoot = findLinkedInShadowRoot();
+        if (!shadowRoot)
+            return false;
+        setupSidebarHeaderClickListener();
+        const sidebar = findSidebar();
+        if (sidebar) {
+            setupMutationObserver(sidebar);
+            clearInterval(intervalId);
+            return true;
+        }
+        return false;
+    };
+    const startPolling = () => {
+        let fastAttempts = 0;
+        const fastPoll = setInterval(() => {
+            checkForLinkedIn(fastPoll);
+            fastAttempts++;
+            if (fastAttempts >= POLLING_CONFIG.fastRetries) {
+                clearInterval(fastPoll);
+                startSlowPolling();
+            }
+        }, POLLING_CONFIG.fastInterval);
+    };
+    const startSlowPolling = () => {
+        let slowAttempts = 0;
+        const slowPoll = setInterval(() => {
+            checkForLinkedIn(slowPoll);
+            slowAttempts++;
+            if (slowAttempts >= POLLING_CONFIG.slowRetries) {
+                clearInterval(slowPoll);
+            }
+        }, POLLING_CONFIG.slowInterval);
+    };
+    // ========================================
+    // Entry Point
+    // ========================================
+    startPolling();
 })();
