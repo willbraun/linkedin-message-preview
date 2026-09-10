@@ -30,40 +30,16 @@
 	const createBubbleElement = () => {
 		const host = document.createElement('div')
 		const shadowRoot = host.attachShadow({ mode: 'open' })
-
-		const style = document.createElement('style')
-		style.textContent = `
-			.message-preview-bubble {
-				position: fixed;
-				padding: 1.2rem;
-				width: fit-content;
-				max-width: 400px;
-				height: fit-content;
-				background-color: #fff;
-				border-radius: 0.8rem;
-				box-shadow: 0px 1px 1px 1px rgba(0, 0, 0, 0.3);
-				z-index: 1000;
-				visibility: hidden;
-				overflow-y: auto;
-			}
-
-			:host-context(body[data-color-scheme='dark']) .message-preview-bubble {
-				background-color: rgb(28, 31, 35);
-				color: #e4e4e4;
-				border: 1px solid rgba(140, 140, 140, 0.25);
-			}
-
-			.show-bubble {
-				visibility: visible;
-			}
-		`
+		const styleLink = document.createElement('link')
+		styleLink.rel = 'stylesheet'
+		styleLink.href = chrome.runtime.getURL('styles.css')
 
 		const bubble = document.createElement('div')
 		bubble.classList.add('message-preview-bubble')
 		bubble.style.setProperty('max-height', `${MAX_HEIGHT}px`)
 		bubble.style.setProperty('font-size', DEFAULT_FONT_SIZE)
 
-		shadowRoot.appendChild(style)
+		shadowRoot.appendChild(styleLink)
 		shadowRoot.appendChild(bubble)
 		document.body.appendChild(host)
 

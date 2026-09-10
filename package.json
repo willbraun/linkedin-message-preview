@@ -3,6 +3,7 @@
     "start": "tsc --watch"
   },
   "devDependencies": {
+    "@types/chrome": "^0.2.9",
     "typescript": "^5.2.2"
   }
 }

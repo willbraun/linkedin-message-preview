@@ -17,5 +17,11 @@
 			"matches": ["https://www.linkedin.com/*"],
 			"js": ["/dest/content-script.js"]
 		}
+	],
+	"web_accessible_resources": [
+		{
+			"resources": ["/styles.css"],
+			"matches": ["https://www.linkedin.com/*"]
+		}
 	]
 }
