@@ -47,13 +47,10 @@
 				overflow-y: auto;
 			}
 
-			html.theme--mercado-dark,
-			html.theme--dark {
-				.message-preview-bubble {
-					background-color: #15171a;
-					color: #e4e4e4;
-					box-shadow: 0px 0px 1px 1px rgba(255, 255, 255, 0.3);
-				}
+			:host-context(body[data-color-scheme='dark']) .message-preview-bubble {
+				background-color: rgb(28, 31, 35);
+				color: #e4e4e4;
+				border: 1px solid rgba(140, 140, 140, 0.25);
 			}
 
 			.show-bubble {
